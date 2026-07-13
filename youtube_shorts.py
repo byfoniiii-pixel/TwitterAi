@@ -15,6 +15,9 @@ from urllib.parse import quote
 import pickle
 import traceback
 
+# Импортируем moviepy правильной версии
+from moviepy.editor import ImageClip, CompositeVideoClip
+
 app = Flask(__name__)
 
 TELEGRAM_CHANNEL = "t.me/sila_mysli_bot"
@@ -27,7 +30,7 @@ def get_quotes():
         "Your only limit is you. Break free! ⭐",
         "Dream it. Believe it. Achieve it. 🎯",
         "Hard work beats talent. Stay disciplined! 💎",
-        "The comeback is always stronger than the setback. ",
+        "The comeback is always stronger than the setback. 💪",
         "Don't stop until you're proud. Keep pushing! 🚀",
         "Your future self is watching. Make them proud! 💡",
         "Small progress is still progress. Keep moving! 🎯",
@@ -57,7 +60,7 @@ def download_background():
     return filename
 
 def create_text_image(quote_text):
-    img = Image.new('RGB', (1080, 1920), color='black')
+    img = Image.new('RGB', (1080, 1920), color=(0, 0, 0))
     draw = ImageDraw.Draw(img)
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70)
@@ -65,6 +68,7 @@ def create_text_image(quote_text):
     except:
         font = ImageFont.load_default()
         small_font = ImageFont.load_default()
+        
     words = quote_text.split()
     lines = []
     current_line = []
@@ -74,6 +78,7 @@ def create_text_image(quote_text):
             lines.append(' '.join(current_line[:-1]))
             current_line = [word]
     lines.append(' '.join(current_line))
+    
     y_position = 650
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)
@@ -82,11 +87,13 @@ def create_text_image(quote_text):
         draw.text((x_position+4, y_position+4), line, fill='#1a1a1a', font=font)
         draw.text((x_position, y_position), line, fill='white', font=font)
         y_position += 90
-    link_text = f" More: {TELEGRAM_CHANNEL}"
+        
+    link_text = f"More: {TELEGRAM_CHANNEL}"
     bbox = draw.textbbox((0, 0), link_text, font=small_font)
     text_width = bbox[2] - bbox[0]
     x_position = (1080 - text_width) // 2
     draw.text((x_position, 1650), link_text, fill='#FF0000', font=small_font)
+    
     filename = f"text_{int(time.time())}.jpg"
     img.save(filename)
     return filename
@@ -106,12 +113,10 @@ def create_short_video():
         print(f"✅ Текст создан: {text_path}")
         
         print("🎬 Создаю видео через moviepy...")
-        from moviepy import ImageClip, CompositeVideoClip
-        
-        clip = ImageClip(background_path, duration=15)
-        text_clip = ImageClip(text_path, duration=15)
-        final_video = CompositeVideoClip([clip, text_clip.with_position('center')])
-        final_video = final_video.with_fps(30)
+        clip = ImageClip(background_path).set_duration(15)
+        text_clip = ImageClip(text_path).set_duration(15)
+        final_video = CompositeVideoClip([clip, text_clip.set_position('center')])
+        final_video = final_video.set_fps(30)
         
         output_file = f"short_{int(time.time())}.mp4"
         print(f"💾 Сохраняю в: {output_file}")
@@ -142,7 +147,7 @@ def upload_to_youtube(video_file, title, description):
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                print("️ Нужно авторизоваться в YouTube")
+                print("⚠️ Нужно авторизоваться в YouTube")
                 return False
         youtube = build("youtube", "v3", credentials=creds)
         body = {
@@ -174,9 +179,9 @@ def auto_post_shorts():
             video_file, quote_text = create_short_video()
             if video_file:
                 title = "This Will Change Your Mindset #Shorts"
-                description = f"{quote_text}\n\n Daily motivation: {TELEGRAM_CHANNEL}\n\n#motivation #success #mindset #inspiration #goals #shorts"
+                description = f"{quote_text}\n\nDaily motivation: {TELEGRAM_CHANNEL}\n\n#motivation #success #mindset #inspiration #goals #shorts"
                 upload_to_youtube(video_file, title, description)
-            time.sleep(14400)
+            time.sleep(14400) # 4 часа
         except Exception as e:
             print(f"❌ Ошибка в автопостинге: {e}")
             traceback.print_exc()
@@ -189,7 +194,7 @@ def home():
 @app.route('/create', methods=['GET'])
 def manual_create():
     try:
-        print(" Ручной запуск создания видео...")
+        print("🔄 Ручной запуск создания видео...")
         video_file, quote_text = create_short_video()
         if video_file:
             return f"✅ Видео создано: {video_file}<br>Цитата: {quote_text}"
