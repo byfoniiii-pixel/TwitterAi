@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for, request
+from flask import Flask, redirect, url_for
 import os
 import time
 import random
@@ -9,11 +9,11 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
-from moviepy import ImageClip, CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont
 import requests
 from urllib.parse import quote
 import pickle
+import traceback
 
 app = Flask(__name__)
 
@@ -24,14 +24,14 @@ def get_quotes():
     return [
         "Every morning is a fresh start. Make it count! 💪",
         "Success is built one day at a time. Keep going! 🔥",
-        "Your only limit is you. Break free! ",
+        "Your only limit is you. Break free! ⭐",
         "Dream it. Believe it. Achieve it. 🎯",
         "Hard work beats talent. Stay disciplined! 💎",
-        "The comeback is always stronger than the setback. 💪",
+        "The comeback is always stronger than the setback. ",
         "Don't stop until you're proud. Keep pushing! 🚀",
         "Your future self is watching. Make them proud! 💡",
-        "Small progress is still progress. Keep moving! ",
-        "You are capable of amazing things. Believe! "
+        "Small progress is still progress. Keep moving! 🎯",
+        "You are capable of amazing things. Believe! ✨"
     ]
 
 def download_background():
@@ -50,13 +50,13 @@ def download_background():
     theme = random.choice(themes)
     encoded = quote(theme)
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&nologo=true&seed={random.randint(1, 99999)}"
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)
     filename = f"background_{int(time.time())}.jpg"
     with open(filename, 'wb') as f:
         f.write(response.content)
     return filename
 
-def create_text_image(quote):
+def create_text_image(quote_text):
     img = Image.new('RGB', (1080, 1920), color='black')
     draw = ImageDraw.Draw(img)
     try:
@@ -65,7 +65,7 @@ def create_text_image(quote):
     except:
         font = ImageFont.load_default()
         small_font = ImageFont.load_default()
-    words = quote.split()
+    words = quote_text.split()
     lines = []
     current_line = []
     for word in words:
@@ -82,7 +82,7 @@ def create_text_image(quote):
         draw.text((x_position+4, y_position+4), line, fill='#1a1a1a', font=font)
         draw.text((x_position, y_position), line, fill='white', font=font)
         y_position += 90
-    link_text = f"👉 More: {TELEGRAM_CHANNEL}"
+    link_text = f" More: {TELEGRAM_CHANNEL}"
     bbox = draw.textbbox((0, 0), link_text, font=small_font)
     text_width = bbox[2] - bbox[0]
     x_position = (1080 - text_width) // 2
@@ -92,24 +92,44 @@ def create_text_image(quote):
     return filename
 
 def create_short_video():
-    print("🎬 Создаю YouTube Short...")
-    quote = random.choice(get_quotes())
-    print(f"Цитата: {quote}")
-    background_path = download_background()
-    text_path = create_text_image(quote)
+    print("🎬 Начинаю создание YouTube Short...")
+    quote_text = random.choice(get_quotes())
+    print(f"Цитата: {quote_text}")
+    
     try:
+        print("📥 Скачиваю фон...")
+        background_path = download_background()
+        print(f"✅ Фон скачан: {background_path}")
+        
+        print("📝 Создаю текст...")
+        text_path = create_text_image(quote_text)
+        print(f"✅ Текст создан: {text_path}")
+        
+        print("🎬 Создаю видео через moviepy...")
+        from moviepy import ImageClip, CompositeVideoClip
+        
         clip = ImageClip(background_path, duration=15)
         text_clip = ImageClip(text_path, duration=15)
         final_video = CompositeVideoClip([clip, text_clip.with_position('center')])
         final_video = final_video.with_fps(30)
+        
         output_file = f"short_{int(time.time())}.mp4"
+        print(f"💾 Сохраняю в: {output_file}")
+        
         final_video.write_videofile(output_file, fps=30, codec='libx264', audio=False, verbose=False, logger=None)
+        
         print(f"✅ Видео создано: {output_file}")
-        os.remove(background_path)
-        os.remove(text_path)
-        return output_file, quote
+        
+        if os.path.exists(background_path):
+            os.remove(background_path)
+        if os.path.exists(text_path):
+            os.remove(text_path)
+        
+        return output_file, quote_text
+        
     except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        print(f"❌ Ошибка в create_short_video: {e}")
+        traceback.print_exc()
         return None, None
 
 def upload_to_youtube(video_file, title, description):
@@ -122,7 +142,7 @@ def upload_to_youtube(video_file, title, description):
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                print("⚠️ Нужно авторизоваться в YouTube")
+                print("️ Нужно авторизоваться в YouTube")
                 return False
         youtube = build("youtube", "v3", credentials=creds)
         body = {
@@ -151,14 +171,15 @@ def auto_post_shorts():
     while True:
         try:
             print(f"\n🕐 {datetime.now()} - Создаю новый Short...")
-            video_file, quote = create_short_video()
+            video_file, quote_text = create_short_video()
             if video_file:
                 title = "This Will Change Your Mindset #Shorts"
-                description = f"{quote}\n\n👉 Daily motivation: {TELEGRAM_CHANNEL}\n\n#motivation #success #mindset #inspiration #goals #shorts"
+                description = f"{quote_text}\n\n Daily motivation: {TELEGRAM_CHANNEL}\n\n#motivation #success #mindset #inspiration #goals #shorts"
                 upload_to_youtube(video_file, title, description)
             time.sleep(14400)
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"❌ Ошибка в автопостинге: {e}")
+            traceback.print_exc()
             time.sleep(3600)
 
 @app.route('/')
@@ -167,11 +188,16 @@ def home():
 
 @app.route('/create', methods=['GET'])
 def manual_create():
-    video_file, quote = create_short_video()
-    if video_file:
-        return f"✅ Видео создано: {video_file}<br>Цитата: {quote}"
-    else:
-        return "❌ Ошибка создания"
+    try:
+        print(" Ручной запуск создания видео...")
+        video_file, quote_text = create_short_video()
+        if video_file:
+            return f"✅ Видео создано: {video_file}<br>Цитата: {quote_text}"
+        else:
+            return "❌ Ошибка: video_file is None. Проверь логи."
+    except Exception as e:
+        error_details = traceback.format_exc()
+        return f"❌ Ошибка: {str(e)}<br><br>Детали:<br>{error_details}"
 
 @app.route('/auth', methods=['GET'])
 def auth_youtube():
@@ -182,8 +208,7 @@ def auth_youtube():
     return redirect(url_for('home'))
 
 if __name__ == "__main__":
-    print(" YouTube Shorts Bot запущен!")
-    create_short_video()
+    print("🚀 YouTube Shorts Bot запущен!")
     thread = threading.Thread(target=auto_post_shorts, daemon=True)
     thread.start()
     app.run(host='0.0.0.0', port=8080)
