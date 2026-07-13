@@ -9,7 +9,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
-from moviepy.editor import *
+from moviepy import ImageClip, CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont
 import requests
 from urllib.parse import quote
@@ -24,14 +24,14 @@ def get_quotes():
     return [
         "Every morning is a fresh start. Make it count! 💪",
         "Success is built one day at a time. Keep going! 🔥",
-        "Your only limit is you. Break free! ⭐",
+        "Your only limit is you. Break free! ",
         "Dream it. Believe it. Achieve it. 🎯",
         "Hard work beats talent. Stay disciplined! 💎",
         "The comeback is always stronger than the setback. 💪",
         "Don't stop until you're proud. Keep pushing! 🚀",
         "Your future self is watching. Make them proud! 💡",
         "Small progress is still progress. Keep moving! ",
-        "You are capable of amazing things. Believe! ✨"
+        "You are capable of amazing things. Believe! "
     ]
 
 def download_background():
@@ -98,11 +98,10 @@ def create_short_video():
     background_path = download_background()
     text_path = create_text_image(quote)
     try:
-        clip = ImageClip(background_path).set_duration(15)
-        text_clip = ImageClip(text_path).set_duration(15)
-        text_clip = text_clip.crossfadein(1)
-        final_video = CompositeVideoClip([clip, text_clip.set_pos('center')])
-        final_video = final_video.set_fps(30)
+        clip = ImageClip(background_path, duration=15)
+        text_clip = ImageClip(text_path, duration=15)
+        final_video = CompositeVideoClip([clip, text_clip.with_position('center')])
+        final_video = final_video.with_fps(30)
         output_file = f"short_{int(time.time())}.mp4"
         final_video.write_videofile(output_file, fps=30, codec='libx264', audio=False, verbose=False, logger=None)
         print(f"✅ Видео создано: {output_file}")
@@ -183,7 +182,7 @@ def auth_youtube():
     return redirect(url_for('home'))
 
 if __name__ == "__main__":
-    print("🚀 YouTube Shorts Bot запущен!")
+    print(" YouTube Shorts Bot запущен!")
     create_short_video()
     thread = threading.Thread(target=auto_post_shorts, daemon=True)
     thread.start()
