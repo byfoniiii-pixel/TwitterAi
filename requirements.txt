@@ -1,9 +1,10 @@
 flask
 requests
-moviepy
+moviepy==1.0.3
 Pillow
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
 google-api-python-client
 gunicorn
+imageio-ffmpeg
