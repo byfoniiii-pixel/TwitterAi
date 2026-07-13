@@ -15,7 +15,7 @@ from urllib.parse import quote
 import pickle
 import traceback
 
-# Импортируем moviepy правильной версии
+# Правильный импорт для moviepy 1.0.3
 from moviepy.editor import ImageClip, CompositeVideoClip
 
 app = Flask(__name__)
